@@ -1,31 +1,31 @@
 ---
 - name: Settings SSH
   hosts: webhosts
-  user: root
+  become: yes
   vars:
     createuser: 'deploy_user'
-    createpassword: 'nizam123@'
-    publickey_path: '/home/deploy_user/.ssh/id_rsa.pub'
+    createpassword: "{{ 'nizam123@' | password_hash('sha512') }}"
+    publickey_path: '/path/to/your/public_key.pub'
+  
   tasks:
-  - name: Setup | create user
-    command: useradd -m {{ createuser }} creates= home/{{ createuser }}
-    sudo: true
+    - name: Setup | create user
+      user:
+        name: "{{ createuser }}"
+        password: "{{ createpassword }}"
+        shell: /bin/bash
+        create_home: yes
 
-  - name: Setup | set user password
-    shell: usermod -p $(echo '{{ createpassword }}' | openssl passwd -1 -stdin) {{ createuser }}
-    sudo: true
- 
-  - name: Setup | authorized key upload
-    authorized_key: user={{ createuser }}
-      key="{{ lookup('file', {{publickey_path}}) }}"
-      path='/home/{{ createuser }}/.ssh/authorized_keys'
-      manage_dir=no
-    sudo: true
- 
-  - name: Sudoers | update sudoers file and validate
-    lineinfile: "dest=/etc/sudoers
-      insertafter=EOF
-      line='{{ createuser }} ALL=(ALL) NOPASSWD: ALL'
-      regexp='{{ createuser }} ALL=(ALL) NOPASSWD: ALL'
-      state=present"
-    sudo: true
+    - name: Setup | authorized key upload
+      authorized_key:
+        user: "{{ createuser }}"
+        key: "{{ lookup('file', publickey_path) }}"
+        path: "/home/{{ createuser }}/.ssh/authorized_keys"
+        manage_dir: yes
+        state: present
+
+    - name: Sudoers | update sudoers file and validate
+      lineinfile:
+        path: /etc/sudoers
+        insertafter: EOF
+        line: "{{ createuser }} ALL=(ALL) NOPASSWD: ALL"
+        state: present
